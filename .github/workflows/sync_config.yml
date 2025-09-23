@@ -18,7 +18,7 @@ jobs:
     - name: Download config file
       run: |
         # 下载文件到临时位置
-        curl -s -o /tmp/config_orig.json "https://download2276.mediafire.com/znbvk8455mxgeu15EJep_sI8XFojGOALt66KPvRyJu_zEFCX_AdkhdO2np9BvLV8FitciNosY26d93Dnp0pA5aWK5SO0VUk6Y6MWucy4xouReq-trK7AbKXjwBYp5-xeterM-ZLHI50gPtgw-3KEjlqi8ROSqJfE9EDRShIlBfcoqaI/ff60ynj6z21iqfb/configplus_isadult.json"
+        curl -s -o /tmp/config_orig.json "https://download2276.mediafire.com/yd29kplgvsugWHwYIbhx5yiHIqoqYtVEuZ2yBLJiXcdVnxh6Gw97v7_uxeo2XVQdLvoxPfrVOGh0P3AofnH7p68-MTzVMog_3n37RB-5qHx-xhcIFOxnNrIAhqPo8W3Q4Xqn-kf8Vum532Ur2_5lQBO7OZnTY_rr-H66Dx29ZiOuZlo/ff60ynj6z21iqfb/configplus_isadult.json"
         
         # 检查文件是否下载成功
         if [ ! -s /tmp/config_orig.json ]; then
