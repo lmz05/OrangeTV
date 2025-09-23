@@ -1,9 +1,8 @@
-name: Daily Config Update
+name: Update Config File
 
 on:
   schedule:
-    # 每天12点运行 (UTC时间)
-    - cron: '0 12 * * *'
+    - cron: '0 3 * * *'  # 每天UTC时间3点运行（注意：UTC时间与您本地时间可能有时差）
   workflow_dispatch:  # 允许手动触发
 
 jobs:
@@ -15,51 +14,53 @@ jobs:
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 0
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: |
-        npm install base58
-
-    - name: Download and encode config file
-      run: |
-        # 下载原始文件
-        curl -s -o configplus_isadult.json "https://download2276.mediafire.com/znbvk8455mxgeu15EJep_sI8XFojGOALt66KPvRyJu_zEFCX_AdkhdO2np9BvLV8FitciNosY26d93Dnp0pA5aWK5SO0VUk6Y6MWucy4xouReq-trK7AbKXjwBYp5-xeterM-ZLHI50gPtgw-3KEjlqi8ROSqJfE9EDRShIlBfcoqaI/ff60ynj6z21iqfb/configplus_isadult.json"
         
+    - name: Download config file
+      run: |
+        # 下载文件到临时位置
+        curl -s -o /tmp/config_orig.json "https://download2276.mediafire.com/znbvk8455mxgeu15EJep_sI8XFojGOALt66KPvRyJu_zEFCX_AdkhdO2np9BvLV8FitciNosY26d93Dnp0pA5aWK5SO0VUk6Y6MWucy4xouReq-trK7AbKXjwBYp5-xeterM-ZLHI50gPtgw-3KEjlqi8ROSqJfE9EDRShIlBfcoqaI/ff60ynj6z21iqfb/configplus_isadult.json"
+        
+        # 检查文件是否下载成功
+        if [ ! -s /tmp/config_orig.json ]; then
+          echo "Error: Downloaded file is empty or failed"
+          exit 1
+        fi
+
         # 使用Node.js进行Base58编码
+        npm install base58
         node -e "
         const fs = require('fs');
         const base58 = require('base58');
-        const data = fs.readFileSync('configplus_isadult.json');
+        const data = fs.readFileSync('/tmp/config_orig.json');
         const encoded = base58.encode(data);
-        fs.writeFileSync('configplus_isadult_base58.json', encoded);
+        fs.writeFileSync('/tmp/config.json', encoded);
         console.log('File encoded successfully');
         "
-
-    - name: Check for changes
-      id: check_changes
+      
+        
+    - name: Check if file has changed
+      id: file_check
       run: |
-        if git diff --quiet HEAD -- configplus_isadult_base58.json; then
-          echo "changes=false" >> $GITHUB_OUTPUT
+        # 检查文件是否存在且内容是否相同
+        if [ -f "config.json" ] && cmp -s "/tmp/config.json" "config.json"; then
+          echo "文件无变化，无需提交"
+          echo "has_changed=false" >> $GITHUB_OUTPUT
         else
-          echo "changes=true" >> $GITHUB_OUTPUT
+          echo "文件有变化，需要提交"
+          echo "has_changed=true" >> $GITHUB_OUTPUT
         fi
-
-    - name: Commit and push if changes
-      if: steps.check_changes.outputs.changes == 'true'
+        
+    - name: Update config file
+      if: steps.file_check.outputs.has_changed == 'true'
       run: |
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git add configplus_isadult_base58.json
-        git commit -m "Auto-update: configplus_isadult_base58.json $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+        # 移动文件到仓库根目录
+        mv /tmp/config.json config.json
+        
+    - name: Commit and push changes
+      if: steps.file_check.outputs.has_changed == 'true'
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add config.json
+        git commit -m "chore: 自动更新config.json配置文件 [$(date +'%Y-%m-%d %H:%M')]"
         git push origin main
-
-    - name: Clean up
-      run: |
-        rm -f configplus_isadult.json
