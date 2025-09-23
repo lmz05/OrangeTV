@@ -1,72 +1,74 @@
-name: Update Config File
+name: Daily Config Update
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # 每天UTC时间3点运行（注意：UTC时间与您本地时间可能有时差）
-  workflow_dispatch:  # 允许手动触发
+    # 每天 UTC 时间 12 点运行
+    - cron: '0 12 * * *'
+  workflow_dispatch:  # 允许手动触发工作流
 
 jobs:
-  update-config:
+  update-and-encode:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout 代码仓库
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0  # 获取完整历史记录
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: Download config file
-      run: |
-        # 下载文件到临时位置
-        curl -s -o /tmp/config_orig.json "https://download2276.mediafire.com/yd29kplgvsugWHwYIbhx5yiHIqoqYtVEuZ2yBLJiXcdVnxh6Gw97v7_uxeo2XVQdLvoxPfrVOGh0P3AofnH7p68-MTzVMog_3n37RB-5qHx-xhcIFOxnNrIAhqPo8W3Q4Xqn-kf8Vum532Ur2_5lQBO7OZnTY_rr-H66Dx29ZiOuZlo/ff60ynj6z21iqfb/configplus_isadult.json"
-        
-        # 检查文件是否下载成功
-        if [ ! -s /tmp/config_orig.json ]; then
-          echo "Error: Downloaded file is empty or failed"
-          exit 1
-        fi
+      - name: 配置 Node.js 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'  # 使用 Node.js 18.x 版本
+          cache: 'npm'        # 缓存 npm 依赖加速安装
 
-        # 使用Node.js进行Base58编码
-        npm install base58
-        node -e "
-        const fs = require('fs');
-        const base58 = require('base58');
-        const data = fs.readFileSync('/tmp/config_orig.json');
-        const encoded = base58.encode(data);
-        fs.writeFileSync('/tmp/config.json', encoded);
-        console.log('File encoded successfully');
-        "
-      
-        
-    - name: Check if file has changed
-      id: file_check
-      run: |
-        # 检查文件是否存在且内容是否相同
-        if [ -f "config.json" ] && cmp -s "/tmp/config.json" "config.json"; then
-          echo "文件无变化，无需提交"
-          echo "has_changed=false" >> $GITHUB_OUTPUT
-        else
-          echo "文件有变化，需要提交"
-          echo "has_changed=true" >> $GITHUB_OUTPUT
-        fi
-        
-    - name: Update config file
-      if: steps.file_check.outputs.has_changed == 'true'
-      run: |
-        # 移动文件到仓库根目录
-        mv /tmp/config.json config.json
-        
-    - name: Commit and push changes
-      if: steps.file_check.outputs.has_changed == 'true'
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
-        git add config.json
-        git commit -m "chore: 自动更新config.json配置文件 [$(date +'%Y-%m-%d %H:%M')]"
-        git push origin main
+      - name: 安装 Base58 编码依赖
+        run: npm install base58
+
+      - name: 下载并编码配置文件
+        run: |
+          # 从指定 URL 下载原始配置文件
+          curl -s -o configplus_isadult.json "https://download2276.mediafire.com/znbvk8455mxgeu15EJep_sI8XFojGOALt66KPvRyJu_zEFCX_AdkhdO2np9BvLV8FitciNosY26d93Dnp0pA5aWK5SO0VUk6Y6MWucy4xouReq-trK7AbKXjwBYp5-xeterM-ZLHI50gPtgw-3KEjlqi8ROSqJfE9EDRShIlBfcoqaI/ff60ynj6z21iqfb/configplus_isadult.json"
+          
+          # 使用 Node.js 脚本进行 Base58 编码
+          node -e "
+            const fs = require('fs');
+            const base58 = require('base58');
+            // 读取下载的文件内容
+            const fileContent = fs.readFileSync('configplus_isadult.json');
+            // 进行 Base58 编码
+            const encodedContent = base58.encode(fileContent);
+            // 将编码结果写入新文件
+            fs.writeFileSync('configplus_isadult_base58.json', encodedContent);
+            console.log('配置文件已成功编码为 Base58 格式');
+          "
+
+      - name: 检查是否有文件变更
+        id: check_changes
+        run: |
+          # 检查编码后的文件是否有修改
+          if git diff --quiet HEAD -- configplus_isadult_base58.json; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 提交并推送变更（如有修改）
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          # 配置 Git 提交信息
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          # 添加变更文件
+          git add configplus_isadult_base58.json
+          # 提交变更，包含时间戳
+          git commit -m "Auto-update: configplus_isadult_base58.json $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          # 推送到 main 分支
+          git push origin main
+
+      - name: 清理临时文件
+        run: |
+          # 删除原始下载文件，只保留编码后的文件在仓库中
+          rm -f configplus_isadult.json
+    
