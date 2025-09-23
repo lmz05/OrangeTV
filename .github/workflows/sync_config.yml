@@ -21,10 +21,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'  # 使用 Node.js 18.x 版本
-          # 移除 npm 缓存配置，避免查找锁文件
           
-      - name: 安装 Base58 编码依赖
-        run: npm install base58
+      - name: 安装 Base58 编码依赖（忽略 peer 依赖冲突）
+        run: npm install base58 --legacy-peer-deps
 
       - name: 下载并编码配置文件
         run: |
